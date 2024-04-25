@@ -17,6 +17,45 @@ Use Docker container in windows
 
 runcoseg.pl -d -m 50 -c ALU.cons -s ALU.seqs -i ALU.ins
 
+## 1. Trim data with fastp 
+
+## 2. align your RNA-seq data to your genome with HISAT2
+https://www.reneshbedre.com/blog/hisat2-sequence-aligner.html
+
+           1. Build index on genome assembly
+
+                      sbatch --partition=pibu_el8 --job-name=H1Hisatindex --time=0-21:00:00 --mem-per-cpu=16G --ntasks=12 --cpus-per-task=1 --output=Hap1_HiSat2index.log --error=Hap1_HiSat2index.err --mail-type=END,FAIL --wrap "cd /data/projects/p782_RNA_seq_Argania_spinosa/21_GenomeAnnotation/02_HISAT2_mapping/01_Hap1; module load HISAT2; hisat2-build hap1.fasta.masked hap1_hisat_index -p 12"
+
+   2. Map reads to genome, sort and compress
+
+
+                sbatch --partition=pibu_el8 --job-name=H1Hisatmap3 --time=3-21:00:00 --mem-per-cpu=16G --ntasks=12 --cpus-per-task=1 --output=Hap1_HiSat2index.log --error=Hap1_HiSat2index.err --mail-type=END,FAIL --wrap "cd /data/projects/p782_RNA_seq_Argania_spinosa/21_GenomeAnnotation/02_HISAT2_mapping/01_Hap1; module load HISAT2; hisat2 --phred33 --dta -x hap1_hisat_index -1 /data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/02_TrimmedData/7A_1_trimmed.fastq.gz,/data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/02_TrimmedData/8A_1_trimmed.fastq.gz,/data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/02_TrimmedData/9A_1_trimmed.fastq.gz -2 /data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/02_TrimmedData/7A_2_trimmed.fastq.gz,/data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/02_TrimmedData/8A_2_trimmed.fastq.gz,/data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/02_TrimmedData/9A_2_trimmed.fastq.gz -S threeControlSamples_Hap1.sam -p 12"
+
+                sbatch --partition=pibu_el8 --job-name=H1SAMTOOLS --time=0-21:00:00 --mem-per-cpu=16G --ntasks=12 --cpus-per-task=1 --output=Hap1_SAMTOOLS.log --error=Hap1__SAMTOOLS.err --mail-type=END,FAIL --wrap "cd /data/projects/p782_RNA_seq_Argania_spinosa/21_GenomeAnnotation/02_HISAT2_mapping/01_Hap1; module load SAMtools; samtools view --threads 12 -b -o threeControlSamples_Hap1.bam threeControlSamples_Hap1.sam; samtools sort -m 7G -o threeControlSamples_Hap1_sorted.bam -T threeControlSamples_Hap1_temp --threads 12 threeControlSamples_Hap1.bam"
+
+
+## BRAKER3 annotation with GALAXY
+
+Run BRAKER3pipeline in galaxy it needs as input a genome assembly, proteins from related species and mapped RNAseq reads to the assembly.
+
+it gives as output a .gff3 file
+
+convert gff to transcripts and proteins with gffread on local
+
+        #convert to proteins
+        /Users/mateusgo/ZZ_Software/gffread/gffread -y proteins.fa -g hap1.fasta.masked hap1_Braker.gff3
+
+        # convert to transcripts
+        /Users/mateusgo/ZZ_Software/gffread/gffread -w transcripts.fa -g hap1.fasta.masked hap1_Braker.gff3
+
+Then busco the annotation on cluster
+
+            sbatch --partition=pibu_el8 --job-name=LFh1protBusco --time=0-04:00:00 --mem-per-cpu=50G --ntasks=36 --cpus-per-task=1 --output=BuscoFunHap1.out --error=BuscoFunHap1.error --mail-type=END,FAIL --wrap "module load BUSCO; cd /data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/07_Busco/v2/; busco -o Funannotate_hap1 -i Argania_spinosa_DR.proteins.fa -l embryophyta_odb10 --cpu 36 -m proteins -f"
+
+
+sbatch --partition=pibu_el8 --job-name=BRAKER3h1protBusco --time=0-04:00:00 --mem-per-cpu=50G --ntasks=36 --cpus-per-task=1 --output=BuscoBRAKERHap1.out --error=BuscoBRAKERHap1.error --mail-type=END,FAIL --wrap "module load BUSCO; cd /data/projects/p782_RNA_seq_Argania_spinosa/21_RNAseqV2/07_Busco/v2/; busco -o BRAKER3_hap1 -i hap1_Braker_proteins.fa -l embryophyta_odb10 --cpu 36 -m proteins -f"
+
+
 
 
 
